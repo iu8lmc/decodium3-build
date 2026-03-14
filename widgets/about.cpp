@@ -5,6 +5,7 @@
 #include <QString>
 
 #include "revision_utils.hpp"
+#include "scs_version.h"
 
 #include "ui_about.h"
 
@@ -18,7 +19,7 @@ CAboutDlg::CAboutDlg(QWidget *parent) :
     "<p align=\"center\"><img src=\":/ft2logo.png\" width=\"180\" height=\"180\" /></p>"
     "<h2 align=\"center\">Decodium 3.0 ASYMX</h2>"
     "<h3 align=\"center\"><i>Official Release</i></h3>"
-    "<p align=\"center\" style=\"font-size:14px;\"><b>Build 2603141435</b></p>"
+    "<p align=\"center\" style=\"font-size:14px;\"><b>Build " SCS_VERSION_STR "</b></p>"
     "<p align=\"center\">"
     "<a href=\"https://buymeacoffee.com/iu8lmc\" style=\""
     "background-color:#FFDD00;color:#000000;font-family:Arial,sans-serif;"
