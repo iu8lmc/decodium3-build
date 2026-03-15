@@ -4285,7 +4285,7 @@ void MainWindow::process_autoButton (bool checked)   //manually or by controller
     // Async FT2: arm guard timer for immediate TX start
     if (m_mode == "FT2" && ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked()) {
       if (!m_asyncTxGuardTimer.isActive()) {
-        m_asyncTxGuardTimer.start(100);
+        m_asyncTxGuardTimer.start(300);  // 300ms guard (LZ2HV: ensures FD=0.0 in decode lists)
       }
     }
 
@@ -4356,7 +4356,7 @@ void MainWindow::auto_tx_mode (bool state)
   // Async FT2: arm guard timer for immediate TX (bypass period wait)
   if (state && m_mode == "FT2" && ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked()) {
     if (!m_asyncTxGuardTimer.isActive()) {
-      m_asyncTxGuardTimer.start(100);  // 100ms guard before TX
+      m_asyncTxGuardTimer.start(300);  // 300ms guard (LZ2HV: ensures FD=0.0 in decode lists)
     }
   }
 }
@@ -6945,6 +6945,34 @@ void MainWindow::readFromStdout()                             //readFromStdout
       and (!(m_mode=="FT2" &&
            (message0.contains("? a")                                              // AP low-confidence decodes
            || (decodedtext.snr() < -21 && decodedtext.isLowConfidence()))))       // very weak + uncertain
+      // FDR step 4: FT2 callsign validity filter (LZ2HV recommendation)
+      // Reject decodes with callsigns that don't match ITU format.
+      // ITU callsign: prefix (1-2 chars) + 1 digit + suffix (1-4 letters)
+      // With optional /prefix or /suffix for portable etc.
+      // Rejects: AI0ANB444P1 (too long, multiple digits), W92FSE (2 digits in call body)
+      and (!(m_mode=="FT2" && [&]() -> bool {
+           auto words = decodedtext.messageWords();
+           // ITU callsign regex: handles all standard formats including
+           // 1x1-3 (W1AW), 2x1-4 (IW8XOU), special prefix/ and /suffix
+           // The key rule: exactly ONE digit separates the prefix from suffix
+           static QRegularExpression ituCallRe(
+             R"(^(?:[A-Z0-9]{1,4}/)?)"          // optional prefix/ (e.g., VP2X/)
+             R"((?:)"
+               R"([A-Z]{1,2}[0-9][A-Z]{1,4})"   // standard: AA0A to ZZ9ZZZZ
+               R"(|[0-9][A-Z][0-9][A-Z]{1,4})"   // special: 3D2AG, 4X1RF
+               R"(|[0-9]{2}[A-Z]{1,4})"           // numeric prefix: 9A1A (Croatia)
+             R"())"
+             R"((?:/[A-Z0-9]{1,3})?$)"           // optional /suffix (/P, /MM, /R)
+           );
+           for (int i = 2; i <= 3 && i < words.size(); ++i) {
+             QString w = words[i].toUpper().trimmed();
+             if (w.isEmpty() || w == "CQ" || w == "DE" || w == "QRZ"
+                 || w == "..." || w.startsWith("CQ")) continue;
+             if (w.length() > 11) return true;                    // too long for any callsign
+             if (!ituCallRe.match(w).hasMatch()) return true;     // not a valid ITU callsign
+           }
+           return false;
+      }()))
       )
     {
     if (m_mode!="FT8" and m_mode!="FT2" and m_mode!="FT4" and !m_mode.startsWith ("FST4") and m_mode!="Q65") {
